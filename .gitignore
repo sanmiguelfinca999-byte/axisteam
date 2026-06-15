@@ -12,3 +12,5 @@ dist
 # Logs y temporales
 *.log
 .DS_Store
+
+.vercel

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Shield, Lock, User, AlertTriangle, Eye, EyeOff } from 'lucide-react'
 import { useNEXUS } from '../../context/NEXUSContext'
+import { MODE } from '../../lib/dataSource'
 
 export default function LoginScreen() {
   const { login } = useNEXUS()
@@ -14,11 +15,19 @@ export default function LoginScreen() {
     e.preventDefault()
     setError('')
     setLoading(true)
-    await new Promise(r => setTimeout(r, 600))
-    const result = login(username.trim().toLowerCase(), password)
-    setLoading(false)
-    if (!result.ok) setError(result.error)
+    try {
+      // En modo Supabase aceptamos email; en modo local, username
+      const id = MODE === 'supabase' ? username.trim() : username.trim().toLowerCase()
+      const result = await login(id, password)
+      if (!result.ok) setError(result.error)
+    } catch (err) {
+      setError(err?.message || 'Error de autenticación')
+    } finally {
+      setLoading(false)
+    }
   }
+
+  const isCloud = MODE === 'supabase'
 
   return (
     <div className="min-h-screen bg-nexus-bg flex items-center justify-center relative overflow-hidden">
@@ -30,13 +39,13 @@ export default function LoginScreen() {
         style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%)' }} />
 
       <div className="absolute top-4 left-4 text-nexus-muted text-xs font-mono opacity-40">
-        AXIS//SYS v3.0 | SECURE CHANNEL ACTIVE
+        AXIS//SYS v4.1 | {isCloud ? 'CLOUD SYNC ACTIVE' : 'OFFLINE MODE'}
       </div>
       <div className="absolute top-4 right-4 text-nexus-muted text-xs font-mono opacity-40">
         {new Date().toLocaleString('es-MX', { hour12: false })}
       </div>
       <div className="absolute bottom-4 left-4 text-nexus-muted text-xs font-mono opacity-30">
-        ENCRYPTION: AES-256 | AUTH: TWO-FACTOR
+        ENCRYPTION: AES-256 | AUTH: {isCloud ? 'SUPABASE' : 'TWO-FACTOR'}
       </div>
 
       <div className="relative z-10 w-full max-w-md mx-4">
@@ -68,10 +77,13 @@ export default function LoginScreen() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="login-user" className="block text-nexus-muted text-xs font-mono uppercase mb-1 tracking-widest">Identificador</label>
+              <label htmlFor="login-user" className="block text-nexus-muted text-xs font-mono uppercase mb-1 tracking-widest">
+                {isCloud ? 'Email' : 'Identificador'}
+              </label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-nexus-muted" />
-                <input id="login-user" type="text" value={username} onChange={e => setUsername(e.target.value)} placeholder="usuario" autoComplete="username"
+                <input id="login-user" type={isCloud ? 'email' : 'text'} value={username} onChange={e => setUsername(e.target.value)}
+                  placeholder={isCloud ? 'director@axis.demo' : 'usuario'} autoComplete="username"
                   className="w-full bg-nexus-bg border border-nexus-border rounded-md py-3 pl-10 pr-4 text-nexus-text placeholder-nexus-muted/50 font-mono focus:outline-none focus:border-blue-500 transition-colors" />
               </div>
             </div>
