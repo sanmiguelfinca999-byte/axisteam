@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
-import { Target, ChevronDown, Calendar, CheckCircle2, Clock, Sparkles, Plus } from 'lucide-react'
+import { Target, ChevronDown, Calendar, CheckCircle2, Clock, Sparkles, Plus, Flag } from 'lucide-react'
 import { useNEXUS } from '../../context/NEXUSContext'
 import QuickForm from './QuickForm'
+import SprintRetroModal from '../sprint/SprintRetroModal'
 
 const STATE_STYLES = {
   ACTIVE:    { label: 'Activo',     dot: 'bg-blue-400 status-pulse',  text: 'text-blue-300'  },
@@ -14,9 +15,10 @@ const STATE_STYLES = {
  * Muestra el sprint activo y permite ver/cambiar a otros sprints (próximos o cerrados).
  */
 export default function SprintSelector() {
-  const { sprintActivo, sprints, crearSprint } = useNEXUS()
+  const { sprintActivo, sprints, crearSprint, isDirector } = useNEXUS()
   const [open, setOpen] = useState(false)
   const [newOpen, setNewOpen] = useState(false)
+  const [retroSprint, setRetroSprint] = useState(null)
   const ref = useRef(null)
 
   const handleCreate = (v) => {
@@ -95,7 +97,13 @@ export default function SprintSelector() {
             })}
           </div>
 
-          <div className="border-t border-nexus-border/40 p-2">
+          <div className="border-t border-nexus-border/40 p-2 space-y-1">
+            {isDirector && sprintActivo && (
+              <button onClick={() => { setOpen(false); setRetroSprint(sprintActivo) }}
+                className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded text-xs font-mono text-purple-300 hover:bg-purple-900/20 transition-colors">
+                <Flag className="w-3 h-3" />Cerrar sprint con retro
+              </button>
+            )}
             <button onClick={() => { setOpen(false); setNewOpen(true) }}
               className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded text-xs font-mono text-blue-300 hover:bg-blue-900/20 transition-colors">
               <Plus className="w-3 h-3" />Nuevo sprint
@@ -115,6 +123,12 @@ export default function SprintSelector() {
           { name: 'goal',   label: 'Sprint Goal',       type: 'textarea', required: true, placeholder: 'El objetivo único de este ciclo...' },
           { name: 'dias',   label: 'Duración (días)',   type: 'number', defaultValue: 14, min: 1, max: 90 },
         ]}
+      />
+
+      <SprintRetroModal
+        open={!!retroSprint}
+        sprint={retroSprint}
+        onClose={() => setRetroSprint(null)}
       />
     </div>
   )

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
-import { X, Save, Trash2, Target, User, Calendar, Flag, Hash, Link2, AlertTriangle } from 'lucide-react'
+import { X, Save, Trash2, Target, User, Calendar, Flag, Hash, Link2, AlertTriangle, Sparkles } from 'lucide-react'
 import { useNEXUS } from '../../context/NEXUSContext'
+import { MISSION_TEMPLATES } from '../../data/missionTemplates'
 
 const FIBONACCI = [1, 2, 3, 5, 8, 13, 21]
 const PRIORIDADES = ['CRITICA', 'ALTA', 'NORMAL', 'BAJA']
@@ -75,6 +76,19 @@ export default function MissionComposer({ open, onClose, mission, defaults = {} 
 
   const update = (k, v) => setForm(prev => ({ ...prev, [k]: v }))
 
+  const applyTemplate = (tpl) => {
+    const fechaTpl = new Date()
+    fechaTpl.setDate(fechaTpl.getDate() + (tpl.defaults.diasDuracion || 7))
+    setForm(prev => ({
+      ...prev,
+      titulo:      tpl.defaults.titulo,
+      descripcion: tpl.defaults.descripcion,
+      prioridad:   tpl.defaults.prioridad || prev.prioridad,
+      storyPoints: tpl.defaults.storyPoints || prev.storyPoints,
+      fechaLimite: fechaTpl.toISOString().slice(0, 10),
+    }))
+  }
+
   const handleSubmit = (e) => {
     e.preventDefault()
     const payload = {
@@ -116,6 +130,23 @@ export default function MissionComposer({ open, onClose, mission, defaults = {} 
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-4">
+          {!isEdit && (
+            <div>
+              <label className={labelCls}><Sparkles className="w-3 h-3 inline mr-1" />Plantilla (opcional)</label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {MISSION_TEMPLATES.map(tpl => (
+                  <button key={tpl.id} type="button" onClick={() => applyTemplate(tpl)}
+                    title={tpl.descripcionCorta}
+                    className="flex flex-col items-start gap-0.5 p-2 rounded border border-nexus-border bg-nexus-bg/30 hover:border-purple-500 hover:bg-purple-900/10 transition-all text-left">
+                    <span className="text-base" aria-hidden="true">{tpl.icon}</span>
+                    <span className="text-nexus-text text-xs font-medium leading-tight">{tpl.nombre}</span>
+                    <span className="text-nexus-muted text-[10px] line-clamp-1">{tpl.descripcionCorta}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div>
             <label htmlFor="mc-titulo" className={labelCls}>Título</label>
             <input id="mc-titulo" type="text" required autoFocus
