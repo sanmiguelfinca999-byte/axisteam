@@ -16,7 +16,7 @@ import CommandPalette from './components/ui/CommandPalette'
 const StrategyView      = lazy(() => import('./components/strategy/StrategyView'))
 const SIRHistorial      = lazy(() => import('./components/sir/SIRHistorial'))
 const DashboardMetrics  = lazy(() => import('./components/hud/DashboardMetrics'))
-const CapacityView      = lazy(() => import('./components/capacity/CapacityView'))
+const TeamView          = lazy(() => import('./components/capacity/TeamView'))
 
 function ViewSuspense({ children }) {
   return (
@@ -241,7 +241,7 @@ function AppInner() {
         {isDirector ? (
           activeView === 'hud'      ? <CoronelHUD /> :
           activeView === 'strategy' ? <div className="h-full overflow-y-auto"><ViewSuspense><StrategyView /></ViewSuspense></div> :
-          activeView === 'team'     ? <div className="h-full overflow-y-auto"><ViewSuspense><CapacityView /></ViewSuspense></div> :
+          activeView === 'team'     ? <div className="h-full overflow-y-auto"><ViewSuspense><TeamView /></ViewSuspense></div> :
           activeView === 'sirs'     ? <div className="h-full overflow-y-auto"><ViewSuspense><SIRHistorial /></ViewSuspense></div> :
           activeView === 'metrics'  ? <div className="h-full overflow-y-auto"><ViewSuspense><DashboardMetrics /></ViewSuspense></div> :
           <CoronelHUD />
