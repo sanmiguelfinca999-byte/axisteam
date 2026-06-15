@@ -1,5 +1,5 @@
 import { useEffect, useState, lazy, Suspense } from 'react'
-import { Shield, LayoutGrid, FileText, TrendingUp, LogOut, Sun, Moon, WifiOff, Target, Plus } from 'lucide-react'
+import { Shield, LayoutGrid, FileText, TrendingUp, LogOut, Sun, Moon, WifiOff, Target, Plus, Users, Command } from 'lucide-react'
 import { NEXUSProvider, useNEXUS } from './context/NEXUSContext'
 import LoginScreen from './components/auth/LoginScreen'
 import ActivoCard from './components/hud/ActivoCard'
@@ -10,11 +10,13 @@ import NotificationCenter from './components/ui/NotificationCenter'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 import SprintSelector from './components/ui/SprintSelector'
 import MissionComposer from './components/mision/MissionComposer'
+import CommandPalette from './components/ui/CommandPalette'
 
 // Lazy-load views secundarias (reducen bundle inicial)
 const StrategyView      = lazy(() => import('./components/strategy/StrategyView'))
 const SIRHistorial      = lazy(() => import('./components/sir/SIRHistorial'))
 const DashboardMetrics  = lazy(() => import('./components/hud/DashboardMetrics'))
+const CapacityView      = lazy(() => import('./components/capacity/CapacityView'))
 
 function ViewSuspense({ children }) {
   return (
@@ -44,14 +46,16 @@ function useOnlineStatus() {
   return online
 }
 
-function Topbar({ onCompose }) {
+function Topbar({ onCompose, onPalette }) {
   const { currentUser, isDirector, logout, activeView, setActiveView, metricas, darkMode, toggleDarkMode, sirs } = useNEXUS()
+  const isMac = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform)
   const sirsPendientes = sirs.filter(s => !s.leido).length
   const online = useOnlineStatus()
 
   const navItems = isDirector ? [
     { id: 'hud',      label: 'Command',  icon: LayoutGrid },
     { id: 'strategy', label: 'Strategy', icon: Target },
+    { id: 'team',     label: 'Team',     icon: Users },
     { id: 'sirs',     label: `Briefs${sirsPendientes > 0 ? ` (${sirsPendientes})` : ''}`, icon: FileText },
     { id: 'metrics',  label: 'Insights', icon: TrendingUp },
   ] : []
@@ -88,6 +92,15 @@ function Topbar({ onCompose }) {
       )}
 
       <div className="flex items-center gap-1">
+        {onPalette && currentUser && (
+          <button onClick={onPalette}
+            title={`Command palette (${isMac ? '⌘' : 'Ctrl'}+K)`}
+            aria-label="Abrir command palette"
+            className="hidden md:flex items-center gap-1.5 px-2 py-1.5 rounded text-xs font-mono text-nexus-muted hover:text-nexus-text hover:bg-nexus-bg/60 transition-all">
+            <Command className="w-3.5 h-3.5" />
+            <kbd className="text-[9px] bg-nexus-bg/60 border border-nexus-border px-1 rounded">{isMac ? '⌘' : 'Ctrl'}K</kbd>
+          </button>
+        )}
         {isDirector && onCompose && (
           <button onClick={onCompose}
             title="Nueva misión (N)"
@@ -178,6 +191,9 @@ function AppInner() {
   const [composerOpen, setComposerOpen] = useState(false)
   const [composerMission, setComposerMission] = useState(null)
   const [composerDefaults, setComposerDefaults] = useState({})
+  const [paletteOpen, setPaletteOpen] = useState(false)
+
+  const openComposer = () => { setComposerMission(null); setComposerDefaults({}); setComposerOpen(true) }
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode)
@@ -185,20 +201,25 @@ function AppInner() {
     document.body.style.color      = darkMode ? '#e0e6ff' : '#1e2a5e'
   }, [darkMode])
 
-  // Atajo "N" para nueva misión (solo Director)
+  // Atajos globales: N (nueva misión), Cmd/Ctrl+K (command palette)
   useEffect(() => {
-    if (!isDirector) return
+    const isTyping = () => ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)
     const onKey = (e) => {
-      if (e.key === 'n' && !composerOpen && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) {
+      // Cmd+K / Ctrl+K → command palette
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
-        setComposerMission(null)
-        setComposerDefaults({})
-        setComposerOpen(true)
+        setPaletteOpen(o => !o)
+        return
+      }
+      if (!isDirector) return
+      if (e.key === 'n' && !composerOpen && !paletteOpen && !isTyping()) {
+        e.preventDefault()
+        openComposer()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [isDirector, composerOpen])
+  }, [isDirector, composerOpen, paletteOpen])
 
   // Exponer apertura del composer al árbol (los hijos lo invocan via custom event)
   useEffect(() => {
@@ -215,11 +236,12 @@ function AppInner() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden scanlines">
-      <Topbar onCompose={isDirector ? (() => { setComposerMission(null); setComposerDefaults({}); setComposerOpen(true) }) : null} />
+      <Topbar onCompose={isDirector ? openComposer : null} onPalette={() => setPaletteOpen(true)} />
       <main className="flex-1 overflow-hidden">
         {isDirector ? (
           activeView === 'hud'      ? <CoronelHUD /> :
           activeView === 'strategy' ? <div className="h-full overflow-y-auto"><ViewSuspense><StrategyView /></ViewSuspense></div> :
+          activeView === 'team'     ? <div className="h-full overflow-y-auto"><ViewSuspense><CapacityView /></ViewSuspense></div> :
           activeView === 'sirs'     ? <div className="h-full overflow-y-auto"><ViewSuspense><SIRHistorial /></ViewSuspense></div> :
           activeView === 'metrics'  ? <div className="h-full overflow-y-auto"><ViewSuspense><DashboardMetrics /></ViewSuspense></div> :
           <CoronelHUD />
@@ -233,6 +255,11 @@ function AppInner() {
         onClose={() => setComposerOpen(false)}
         mission={composerMission}
         defaults={composerDefaults}
+      />
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        onCompose={openComposer}
       />
     </div>
   )
