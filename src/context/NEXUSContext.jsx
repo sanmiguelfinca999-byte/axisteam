@@ -19,6 +19,7 @@ import {
   objectiveFromDb,
   krFromDb,
   operatorFromDb,
+  eventFromDb,
 } from '../lib/mappers'
 
 const NEXUSContext = createContext(null)
@@ -92,10 +93,21 @@ export function NEXUSProvider({ children }) {
   const [objectivesCloud, setObjectivesCloud] = useState([])
   const [keyResultsCloud, setKeyResultsCloud] = useState([])
   const [operatorsCloud, setOperatorsCloud]   = useState([])
+  const [eventsCloud, setEventsCloud]         = useState([])
   const [cloudLoaded, setCloudLoaded]         = useState(!IS_CLOUD)
 
-  // Decisión: qué estado usar
-  const tasks       = IS_CLOUD ? tasksCloud       : tasksLocal
+  // Hidratar tasks con eventos (cloud: del store separado; local: ya embebidos)
+  const tasksRaw    = IS_CLOUD ? tasksCloud       : tasksLocal
+  const tasks       = useMemo(() => {
+    if (!IS_CLOUD) return tasksRaw
+    const byMission = {}
+    for (const ev of eventsCloud) {
+      if (!byMission[ev.missionId]) byMission[ev.missionId] = []
+      byMission[ev.missionId].push(ev)
+    }
+    return tasksRaw.map(t => ({ ...t, eventos: byMission[t.id] || [] }))
+  }, [tasksRaw, eventsCloud])
+
   const sprints     = IS_CLOUD ? sprintsCloud     : sprintsLocal
   const objectives  = IS_CLOUD ? objectivesCloud  : objectivesLocal
   const keyResults  = IS_CLOUD ? keyResultsCloud  : keyResultsLocal
@@ -137,18 +149,22 @@ export function NEXUSProvider({ children }) {
       if (profile) setCurrentUser(operatorFromDb(profile))
 
       // Carga inicial paralela (RLS filtra automáticamente)
-      const [mRes, sRes, oRes, kRes, opRes] = await Promise.all([
+      const [mRes, sRes, oRes, kRes, opRes, eRes] = await Promise.all([
         supabase.from('missions').select('*').order('fecha_creacion', { ascending: false }),
         supabase.from('sprints').select('*').order('fecha_inicio'),
         supabase.from('objectives').select('*'),
         supabase.from('key_results').select('*').order('posicion'),
         supabase.from('operators').select('*'),
+        supabase.from('events').select('*').order('created_at', { ascending: true }),
       ])
+      const ops = (opRes.data || []).map(operatorFromDb)
       setTasksCloud((mRes.data || []).map(missionFromDb))
       setSprintsCloud((sRes.data || []).map(sprintFromDb))
       setObjectivesCloud((oRes.data || []).map(objectiveFromDb))
       setKeyResultsCloud((kRes.data || []).map(krFromDb))
-      setOperatorsCloud((opRes.data || []).map(operatorFromDb))
+      setOperatorsCloud(ops)
+      const opMap = Object.fromEntries(ops.map(o => [o.id, o.codename]))
+      setEventsCloud((eRes.data || []).map(e => eventFromDb({ ...e, autor_codename: opMap[e.autor_id] })))
       setCloudLoaded(true)
 
       // Realtime: cambios en missions
@@ -187,6 +203,13 @@ export function NEXUSProvider({ children }) {
             const next = krFromDb(payload.new)
             const i = prev.findIndex(k => k.id === next.id)
             if (i >= 0) { const copy = [...prev]; copy[i] = next; return copy }
+            return [...prev, next]
+          })
+        })
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'events' }, (payload) => {
+          setEventsCloud(prev => {
+            const next = eventFromDb(payload.new)
+            if (prev.find(e => e.id === next.id)) return prev
             return [...prev, next]
           })
         })
@@ -271,11 +294,26 @@ export function NEXUSProvider({ children }) {
     setTasks(prev => prev.filter(t => t.id !== id))
   }, [setTasks])
 
+  // Helper: registrar evento (cloud → tabla events; local → embebido)
+  const recordEvent = useCallback(async (missionId, tipo, payload = {}, autorOverride = null) => {
+    const autor = autorOverride || currentUser?.codename || 'SISTEMA'
+    const evento = mkEvento(tipo, autor, payload)
+    if (IS_CLOUD) {
+      const { error } = await supabase.from('events').insert({
+        mission_id: missionId,
+        tipo,
+        autor_id: currentUser?.id || null,
+        payload,
+      })
+      if (error) console.error('[AXIS::event]', error)
+    }
+    return evento
+  }, [currentUser])
+
   // ---- Mission CRUD ----------------------------------------
   const crearMision = useCallback(async (data) => {
     const id = `T-${Date.now().toString(36).toUpperCase()}`
-    const autor = currentUser?.codename || 'DIRECTOR'
-    const evento = mkEvento('CREATED', autor, { titulo: data.titulo })
+    const evento = mkEvento('CREATED', currentUser?.codename || 'DIRECTOR', { titulo: data.titulo })
     const nueva = {
       id,
       activoId: data.activoId,
@@ -293,12 +331,13 @@ export function NEXUSProvider({ children }) {
       bloqueaA: data.bloqueaA ?? [],
       bloqueadaPor: data.bloqueadaPor ?? [],
       storyPoints: data.storyPoints ?? null,
-      eventos: [evento],
+      eventos: IS_CLOUD ? [] : [evento],
     }
     await persistMission(nueva)
+    if (IS_CLOUD) await recordEvent(id, 'CREATED', { titulo: data.titulo })
     agregarNotificacion({ tipo: 'CREACION', mensaje: `Nueva misión: "${nueva.titulo}"`, timestamp: evento.timestamp })
     return nueva
-  }, [persistMission, currentUser, agregarNotificacion])
+  }, [persistMission, currentUser, agregarNotificacion, recordEvent])
 
   const actualizarMision = useCallback(async (tareaId, patch) => {
     const existing = tasks.find(t => t.id === tareaId)
@@ -315,11 +354,11 @@ export function NEXUSProvider({ children }) {
   const completarTarea = useCallback(async (tareaId) => {
     const existing = tasks.find(t => t.id === tareaId)
     if (!existing) return
-    const autor = currentUser?.codename || 'SISTEMA'
-    const evento = mkEvento('COMPLETED', autor, {})
-    const next = { ...existing, estado: 'COMPLETADA', progreso: 100, eventos: [...(existing.eventos || []), evento] }
+    const evento = mkEvento('COMPLETED', currentUser?.codename || 'SISTEMA', {})
+    const next = { ...existing, estado: 'COMPLETADA', progreso: 100, eventos: IS_CLOUD ? existing.eventos : [...(existing.eventos || []), evento] }
     await persistMission(next)
-  }, [tasks, persistMission, currentUser])
+    if (IS_CLOUD) await recordEvent(tareaId, 'COMPLETED', {})
+  }, [tasks, persistMission, currentUser, recordEvent])
 
   const actualizarProgreso = useCallback(async (tareaId, progreso) => {
     const existing = tasks.find(t => t.id === tareaId)
@@ -333,10 +372,14 @@ export function NEXUSProvider({ children }) {
     if (!clean) return
     const existing = tasks.find(t => t.id === tareaId)
     if (!existing) return
-    const autor = currentUser?.codename || currentUser?.nombre || 'ANÓNIMO'
-    const evento = mkEvento('COMMENT', autor, { texto: clean })
-    await persistMission({ ...existing, eventos: [...(existing.eventos || []), evento] })
-  }, [tasks, persistMission, currentUser])
+    if (IS_CLOUD) {
+      await recordEvent(tareaId, 'COMMENT', { texto: clean })
+    } else {
+      const autor = currentUser?.codename || currentUser?.nombre || 'ANÓNIMO'
+      const evento = mkEvento('COMMENT', autor, { texto: clean })
+      await persistMission({ ...existing, eventos: [...(existing.eventos || []), evento] })
+    }
+  }, [tasks, persistMission, currentUser, recordEvent])
 
   // ---- Sprints ---------------------------------------------
   const sprintActivo = useMemo(() => sprints.find(s => s.estado === 'ACTIVE') || null, [sprints])
@@ -446,10 +489,10 @@ export function NEXUSProvider({ children }) {
 
     const timestamp = new Date().toISOString()
     const sir = generateSIR({ tarea, activoOrigen, activoDestino, timestamp })
-    const autor = currentUser?.codename || 'DIRECTOR'
-    const evento = mkEvento('REASIGNADA', autor, { de: activoOrigen.codename, a: activoDestino.codename, sirId: sir.id })
+    const evento = mkEvento('REASIGNADA', currentUser?.codename || 'DIRECTOR', { de: activoOrigen.codename, a: activoDestino.codename, sirId: sir.id })
 
-    await persistMission({ ...tarea, activoId: activoDestinoId, reasignada: true, sirId: sir.id, eventos: [...(tarea.eventos || []), evento] })
+    await persistMission({ ...tarea, activoId: activoDestinoId, reasignada: true, sirId: sir.id, eventos: IS_CLOUD ? (tarea.eventos || []) : [...(tarea.eventos || []), evento] })
+    if (IS_CLOUD) await recordEvent(tarea.id, 'REASIGNADA', { de: activoOrigen.codename, a: activoDestino.codename, sirId: sir.id })
 
     if (!IS_CLOUD) {
       setSirs(prev => [sir, ...prev])

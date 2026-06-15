@@ -1,18 +1,33 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, lazy, Suspense } from 'react'
 import { Shield, LayoutGrid, FileText, TrendingUp, LogOut, Sun, Moon, WifiOff, Target, Plus } from 'lucide-react'
 import { NEXUSProvider, useNEXUS } from './context/NEXUSContext'
 import LoginScreen from './components/auth/LoginScreen'
 import ActivoCard from './components/hud/ActivoCard'
 import ActivoDetail from './components/hud/ActivoDetail'
-import DashboardMetrics from './components/hud/DashboardMetrics'
 import ModalCrisis from './components/protocolo/ModalCrisis'
-import SIRHistorial from './components/sir/SIRHistorial'
 import FocusMode from './components/activo/FocusMode'
 import NotificationCenter from './components/ui/NotificationCenter'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 import SprintSelector from './components/ui/SprintSelector'
-import StrategyView from './components/strategy/StrategyView'
 import MissionComposer from './components/mision/MissionComposer'
+
+// Lazy-load views secundarias (reducen bundle inicial)
+const StrategyView      = lazy(() => import('./components/strategy/StrategyView'))
+const SIRHistorial      = lazy(() => import('./components/sir/SIRHistorial'))
+const DashboardMetrics  = lazy(() => import('./components/hud/DashboardMetrics'))
+
+function ViewSuspense({ children }) {
+  return (
+    <Suspense fallback={
+      <div className="h-full flex items-center justify-center text-nexus-muted font-mono text-sm">
+        <span className="w-4 h-4 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin mr-2" />
+        Cargando vista...
+      </div>
+    }>
+      {children}
+    </Suspense>
+  )
+}
 
 function useOnlineStatus() {
   const [online, setOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true)
@@ -204,9 +219,9 @@ function AppInner() {
       <main className="flex-1 overflow-hidden">
         {isDirector ? (
           activeView === 'hud'      ? <CoronelHUD /> :
-          activeView === 'strategy' ? <div className="h-full overflow-y-auto"><StrategyView /></div> :
-          activeView === 'sirs'     ? <div className="h-full overflow-y-auto"><SIRHistorial /></div> :
-          activeView === 'metrics'  ? <div className="h-full overflow-y-auto"><DashboardMetrics /></div> :
+          activeView === 'strategy' ? <div className="h-full overflow-y-auto"><ViewSuspense><StrategyView /></ViewSuspense></div> :
+          activeView === 'sirs'     ? <div className="h-full overflow-y-auto"><ViewSuspense><SIRHistorial /></ViewSuspense></div> :
+          activeView === 'metrics'  ? <div className="h-full overflow-y-auto"><ViewSuspense><DashboardMetrics /></ViewSuspense></div> :
           <CoronelHUD />
         ) : (
           <div className="h-full overflow-y-auto"><FocusMode /></div>

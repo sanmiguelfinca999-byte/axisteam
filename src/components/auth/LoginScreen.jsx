@@ -1,25 +1,35 @@
 import { useState } from 'react'
-import { Shield, Lock, User, AlertTriangle, Eye, EyeOff } from 'lucide-react'
+import { Shield, Lock, User, AlertTriangle, Eye, EyeOff, Mail, CheckCircle2 } from 'lucide-react'
 import { useNEXUS } from '../../context/NEXUSContext'
 import { MODE } from '../../lib/dataSource'
+import { supabase } from '../../lib/supabase'
 
 export default function LoginScreen() {
   const { login } = useNEXUS()
+  const [mode, setMode]         = useState('login') // 'login' | 'reset'
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError]       = useState('')
+  const [info, setInfo]         = useState('')
   const [loading, setLoading]   = useState(false)
   const [showPwd, setShowPwd]   = useState(false)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setError('')
+    setError(''); setInfo('')
     setLoading(true)
     try {
-      // En modo Supabase aceptamos email; en modo local, username
       const id = MODE === 'supabase' ? username.trim() : username.trim().toLowerCase()
-      const result = await login(id, password)
-      if (!result.ok) setError(result.error)
+      if (mode === 'reset') {
+        const { error: err } = await supabase.auth.resetPasswordForEmail(id, {
+          redirectTo: window.location.origin,
+        })
+        if (err) setError(err.message)
+        else setInfo('Si la cuenta existe, recibirás un correo con instrucciones para restablecer tu clave.')
+      } else {
+        const result = await login(id, password)
+        if (!result.ok) setError(result.error)
+      }
     } catch (err) {
       setError(err?.message || 'Error de autenticación')
     } finally {
@@ -81,24 +91,27 @@ export default function LoginScreen() {
                 {isCloud ? 'Email' : 'Identificador'}
               </label>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-nexus-muted" />
+                {mode === 'reset' ? <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-nexus-muted" /> : <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-nexus-muted" />}
                 <input id="login-user" type={isCloud ? 'email' : 'text'} value={username} onChange={e => setUsername(e.target.value)}
-                  placeholder={isCloud ? 'director@axis.demo' : 'usuario'} autoComplete="username"
+                  placeholder={isCloud ? 'director@axis.demo' : 'usuario'} autoComplete="username" required
                   className="w-full bg-nexus-bg border border-nexus-border rounded-md py-3 pl-10 pr-4 text-nexus-text placeholder-nexus-muted/50 font-mono focus:outline-none focus:border-blue-500 transition-colors" />
               </div>
             </div>
-            <div>
-              <label htmlFor="login-pwd" className="block text-nexus-muted text-xs font-mono uppercase mb-1 tracking-widest">Clave de Acceso</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-nexus-muted" />
-                <input id="login-pwd" type={showPwd ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" autoComplete="current-password"
-                  className="w-full bg-nexus-bg border border-nexus-border rounded-md py-3 pl-10 pr-10 text-nexus-text placeholder-nexus-muted/50 font-mono focus:outline-none focus:border-blue-500 transition-colors" />
-                <button type="button" onClick={() => setShowPwd(s => !s)} aria-label={showPwd ? 'Ocultar clave' : 'Mostrar clave'}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-nexus-muted hover:text-nexus-text">
-                  {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+
+            {mode === 'login' && (
+              <div>
+                <label htmlFor="login-pwd" className="block text-nexus-muted text-xs font-mono uppercase mb-1 tracking-widest">Clave de Acceso</label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-nexus-muted" />
+                  <input id="login-pwd" type={showPwd ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" autoComplete="current-password" required
+                    className="w-full bg-nexus-bg border border-nexus-border rounded-md py-3 pl-10 pr-10 text-nexus-text placeholder-nexus-muted/50 font-mono focus:outline-none focus:border-blue-500 transition-colors" />
+                  <button type="button" onClick={() => setShowPwd(s => !s)} aria-label={showPwd ? 'Ocultar clave' : 'Mostrar clave'}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-nexus-muted hover:text-nexus-text">
+                    {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {error && (
               <div className="flex items-center gap-2 text-red-400 text-sm bg-red-900/20 border border-red-800/50 rounded-md px-3 py-2" role="alert">
@@ -106,8 +119,14 @@ export default function LoginScreen() {
                 <span className="font-mono">{error}</span>
               </div>
             )}
+            {info && (
+              <div className="flex items-center gap-2 text-nexus-green text-sm bg-emerald-900/20 border border-emerald-800/50 rounded-md px-3 py-2" role="status">
+                <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                <span className="font-mono">{info}</span>
+              </div>
+            )}
 
-            <button type="submit" disabled={loading || !username || !password}
+            <button type="submit" disabled={loading || !username || (mode === 'login' && !password)}
               className="w-full py-3 rounded-md font-semibold text-sm tracking-widest uppercase transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
               style={{
                 background: loading ? '#1e3a5f' : 'linear-gradient(135deg, #1d4ed8, #2563eb)',
@@ -117,17 +136,28 @@ export default function LoginScreen() {
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
                   <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Autenticando...
+                  {mode === 'reset' ? 'Enviando...' : 'Autenticando...'}
                 </span>
-              ) : 'Acceder al Sistema'}
+              ) : (mode === 'reset' ? 'Enviar enlace de restablecimiento' : 'Acceder al Sistema')}
             </button>
           </form>
 
-          <div className="mt-6 p-3 bg-nexus-bg/50 rounded-md border border-nexus-border/50">
-            <p className="text-nexus-muted text-xs font-mono text-center opacity-60">
-              ¿Olvidaste tu clave? Contacta al Centro de Mando.
-            </p>
-          </div>
+          {isCloud && (
+            <div className="mt-4 text-center">
+              <button type="button" onClick={() => { setMode(mode === 'login' ? 'reset' : 'login'); setError(''); setInfo('') }}
+                className="text-blue-400/80 hover:text-blue-300 text-xs font-mono underline transition-colors">
+                {mode === 'login' ? '¿Olvidaste tu clave?' : '← Volver al login'}
+              </button>
+            </div>
+          )}
+
+          {!isCloud && (
+            <div className="mt-6 p-3 bg-nexus-bg/50 rounded-md border border-nexus-border/50">
+              <p className="text-nexus-muted text-xs font-mono text-center opacity-60">
+                ¿Olvidaste tu clave? Contacta al Centro de Mando.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
