@@ -1,0 +1,28 @@
+node_modules
+dist
+
+# Env (mantén .env.example committeado, los .env reales fuera)
+.env
+.env.local
+.env.*.local
+.env.*.bak
+
+# Vercel / Netlify
+.vercel
+.netlify
+
+# Logs y temporales
+*.log
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode
+.idea
+*.swp
+
+# Supabase local
+supabase/.temp
+
+# Subdirectorio heredado vacío (placeholder)
+/AXIS/

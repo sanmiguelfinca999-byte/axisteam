@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#06091F"/>
+      <stop offset="1" stop-color="#1F2A5E"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5B8DEF"/>
+      <stop offset="1" stop-color="#00D9FF"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+  <circle cx="32" cy="32" r="20" stroke="url(#ring)" stroke-width="2.5" fill="none" opacity="0.85"/>
+  <circle cx="32" cy="32" r="12" stroke="#5B8DEF" stroke-width="1.2" fill="none" opacity="0.5"/>
+  <circle cx="32" cy="32" r="3.5" fill="#00D9FF"/>
+  <path d="M32 6 L32 14 M32 50 L32 58 M6 32 L14 32 M50 32 L58 32" stroke="#5B8DEF" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+  <text x="32" y="62" text-anchor="middle" font-family="monospace" font-size="6" font-weight="700" fill="#7A8AB8" letter-spacing="2">AXIS</text>
+</svg>
