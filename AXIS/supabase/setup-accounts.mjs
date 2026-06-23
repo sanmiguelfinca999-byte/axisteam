@@ -29,65 +29,49 @@ const supabase = createClient(URL, SR, { auth: { autoRefreshToken: false, persis
 // Cuentas a crear (Director + 4 Operators con placeholders)
 // Passwords seguros pero memorables. Cámbialos después del primer login.
 // ============================================================
+// ============================================================
+// Equipo real — Hannah + 2 Operators usando +alias de Gmail
+// Los 3 emails llegan al mismo inbox: sanmiguelfinca999@gmail.com
+// Esto permite validar las 3 vistas (Director + Operator A + Operator B)
+// sin involucrar todavia a los colaboradores reales.
+// Cuando los Operators reales esten listos, actualizar email en
+// Supabase Dashboard → Authentication → Users.
+// ============================================================
 const ACCOUNTS = [
   {
-    email: 'director@axis.demo',
-    password: 'AxisDirector2026!',
+    email: 'sanmiguelfinca999@gmail.com',
+    password: 'AxisLead2026!',
     metadata: {
-      username: 'director',
-      codename: 'DIRECTOR',
+      username: 'lead',
+      codename: 'LEAD',
       nombre:   'Hannah',
       role:     'DIRECTOR',
-      especialidad: 'Command & Strategy',
-      avatar: '🎯',
+      especialidad: 'Coordinacion',
+      avatar: '◆',
     },
   },
   {
-    email: 'phantom@axis.demo',
-    password: 'AxisOperator2026!',
+    email: 'sanmiguelfinca999+opA@gmail.com',
+    password: 'AxisOpA2026!',
     metadata: {
       username: 'phantom',
       codename: 'PHANTOM',
-      nombre:   'Operator 01',
+      nombre:   'Operator A',
       role:     'OPERATOR',
-      especialidad: 'Inteligencia de Datos',
+      especialidad: 'Por definir',
       avatar: '🕵️',
     },
   },
   {
-    email: 'cipher@axis.demo',
-    password: 'AxisOperator2026!',
-    metadata: {
-      username: 'cipher',
-      codename: 'CIPHER',
-      nombre:   'Operator 02',
-      role:     'OPERATOR',
-      especialidad: 'Operaciones de Campo',
-      avatar: '⚡',
-    },
-  },
-  {
-    email: 'nova@axis.demo',
-    password: 'AxisOperator2026!',
+    email: 'sanmiguelfinca999+opB@gmail.com',
+    password: 'AxisOpB2026!',
     metadata: {
       username: 'nova',
       codename: 'NOVA',
-      nombre:   'Operator 03',
+      nombre:   'Operator B',
       role:     'OPERATOR',
-      especialidad: 'Comunicaciones Tácticas',
+      especialidad: 'Por definir',
       avatar: '📡',
-    },
-  },
-  {
-    email: 'wraith@axis.demo',
-    password: 'AxisOperator2026!',
-    metadata: {
-      username: 'wraith',
-      codename: 'WRAITH',
-      nombre:   'Operator 04',
-      role:     'OPERATOR',
-      especialidad: 'Análisis de Amenazas',
-      avatar: '🔍',
     },
   },
 ]
@@ -113,9 +97,11 @@ const run = async () => {
     }
   }
   console.log(`\nResultado: ${ok} creados, ${fail} fallaron.\n`)
-  console.log('Credenciales (cámbialas en primer login):')
-  console.log(`  Director: director@axis.demo / AxisDirector2026!`)
-  console.log(`  Operators: phantom|cipher|nova|wraith @ axis.demo / AxisOperator2026!\n`)
+  console.log('Credenciales (cambialas en primer login):')
+  console.log(`  Director  Hannah  : sanmiguelfinca999@gmail.com       / AxisLead2026!`)
+  console.log(`  Operator  A       : sanmiguelfinca999+opA@gmail.com   / AxisOpA2026!`)
+  console.log(`  Operator  B       : sanmiguelfinca999+opB@gmail.com   / AxisOpB2026!`)
+  console.log(`\nNota: los 3 correos llegan al mismo inbox.\n`)
 }
 
 run().catch(e => { console.error(e); process.exit(1) })
